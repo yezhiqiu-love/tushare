@@ -2,7 +2,6 @@
 import sys
 import pymysql
 sys.path.append("..")
-import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 import time;  # 引入time模块
@@ -48,6 +47,9 @@ def get_stock_id(item,code,current_time,conn,cur):
 
 
 def save_classified_data(df,year,quarter):
+	'''
+	保存行业信息
+	'''
 	conn,cur=getConnAndCur()
 	current_time = getCurrentTime()
 	param=[]
@@ -71,6 +73,9 @@ def save_classified_data(df,year,quarter):
 
 
 def save_stock_basics(df):
+	'''
+	保存stock 列表信息
+	'''
 	conn,cur=getConnAndCur()
 	param=[]
 	for index,item in df.iterrows():
@@ -83,13 +88,14 @@ def save_stock_basics(df):
 			if count == 0:
 				#插入股票信息 
 				cur.execute('''insert into base_stock_info
-					(code,name,area,pe,outstanding,totals,totalAssets,liquidAssets,fixedAssets,reserved,reservedPerShare,eps,bvps,pb,timeToMarket,undp,perundp,rev,profit,gpr,npr,holders,create_time,update_time)
+					(code,name,area,pe,outstanding,totals,totalAssets,liquidAssets,fixedAssets,reserved,reservedPerShare,esp,bvps,pb,timeToMarket,undp,perundp,rev,profit,gpr,npr,holders,create_time,update_time)
 					 values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')
-					 ''' % (item.name,item['name'],item['area'],item['pe'],item['outstanding'],item['totals'],item['totalAssets'],item['liquidAssets'],item['fixedAssets'],item['reserved'],item['reservedPerShare'],item['eps'],item['bvps'],item['pb'],item['timeToMarket'],item['undp'],item['perundp'],item['rev'],item['profit'],item['gpr'],item['npr'],item['holders'],current_time,current_time))
+					 ''' % (item.name,item['name'],item['area'],item['pe'],item['outstanding'],item['totals'],item['totalAssets'],item['liquidAssets'],item['fixedAssets'],item['reserved'],item['reservedPerShare'],item['esp'],item['bvps'],item['pb'],item['timeToMarket'],item['undp'],item['perundp'],item['rev'],item['profit'],item['gpr'],item['npr'],item['holders'],current_time,current_time))
 			else:
 				#更新股票信息 
 				cur.execute('''update base_stock_info
 								set pe='%s',
+									area='%s',
 									outstanding='%s',
 									totals='%s',
 									totalAssets='%s',
@@ -97,7 +103,7 @@ def save_stock_basics(df):
 									fixedAssets='%s',
 									reserved='%s',
 									reservedPerShare='%s',
-									eps='%s',
+									esp='%s',
 									bvps='%s',
 									pb='%s',
 									timeToMarket='%s',
@@ -110,7 +116,7 @@ def save_stock_basics(df):
 									holders='%s',
 									update_time='%s' 
 								where code = '%s'
-					 		''' % (item['pe'],item['outstanding'],item['totals'],item['totalAssets'],item['liquidAssets'],item['fixedAssets'],item['reserved'],item['reservedPerShare'],item['eps'],item['bvps'],item['pb'],item['timeToMarket'],item['undp'],item['perundp'],item['rev'],item['profit'],item['gpr'],item['npr'],item['holders'],current_time,item.name))
+					 		''' % (item['area'],item['pe'],item['outstanding'],item['totals'],item['totalAssets'],item['liquidAssets'],item['fixedAssets'],item['reserved'],item['reservedPerShare'],item['esp'],item['bvps'],item['pb'],item['timeToMarket'],item['undp'],item['perundp'],item['rev'],item['profit'],item['gpr'],item['npr'],item['holders'],current_time,item.name))
 			conn.commit()  
 		except Exception as e:  
 			print(e) 
@@ -122,6 +128,9 @@ def save_stock_basics(df):
 
 
 def save_basic_data(table_name,df,year,quarter):
+	'''
+	保存基本面信息
+	'''
 	conn,cur=getConnAndCur()
 	current_time = getCurrentTime()
 	for index,item in df.iterrows():
@@ -143,6 +152,9 @@ def save_basic_data(table_name,df,year,quarter):
 	conn.close()
 
 def join_insert_sql(table,item,append_dict):
+	'''
+	组拼基本面的insert语句
+	'''
 	insert = ''' insert into %s (''' % table
 	values = []
 	valueParams = ''
@@ -165,6 +177,9 @@ def join_insert_sql(table,item,append_dict):
 
 
 def getCurrentTime():
+	'''
+	获取当前时间， 时间格式为 2017-09-13 14:30:34
+	'''
 	return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 
@@ -195,8 +210,9 @@ def initClassifiedData():
 
 def init_basic_data():
 	# 添加股票列表
-	# df = sf.get_stock_basics()
-	# save_stock_basics(df)
+	df = sf.get_stock_basics()
+	# print(df)
+	save_stock_basics(df)
 
 
 	# 添加基本面信息
@@ -208,13 +224,11 @@ def init_basic_data():
 	stock_debtpay:偿债能力
 	stock_cashflow：现金流量
 	'''
-	df = sf.get_operation_data(2016,4)
-	save_basic_data('stock_operation',df,2016,4)
+	# df = sf.get_operation_data(2016,4)
+	# save_basic_data('stock_operation',df,2016,4)
 
 
 
 
 if __name__ == '__main__':
-	df = sf.get_cashflow_data(2016,3)
-	# df2 = df.astype(object).where(pd.notnull(df), None)
-	save_basic_data('stock_cashflow',df,2016,3)
+	init_basic_data()
