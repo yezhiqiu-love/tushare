@@ -8,6 +8,7 @@ import time;  # 引入time模块
 import tushare as ts
 import pandas as pd
 import numpy as np
+import pandas 
 from tushare.stock import cons as ct
 import tushare.stock.classifying as fd
 import tushare.stock.fundamental as sf
@@ -45,6 +46,11 @@ def get_stock_id(item,code,current_time,conn,cur):
 		stock_id = cur.fetchone()[0]
 	return stock_id
 
+def get_stock_id(code,conn,cur):
+	# 在确定股票存在的情况下，获取股票id 
+	cur.execute("select stock_id from base_stock_info where code = '%s'" % code)
+	stock_id = cur.fetchone()[0]
+	return stock_id
 
 def save_classified_data(df,year,quarter):
 	'''
@@ -141,7 +147,7 @@ def save_basic_data(table_name,df,year,quarter):
 			try: 
 				#插入基本面信息 
 				append_dict = {'year':year,'quarter':quarter,"stock_id":stock_id,"create_time":current_time,'update_time':current_time}
-				cur.execute(join_insert_sql(table_name,item,append_dict))
+				cur.execute(join_insert_sql(table_name,append_dict,item))
 				conn.commit()  
 			except Exception as e:  
 				print(e) 
@@ -151,14 +157,16 @@ def save_basic_data(table_name,df,year,quarter):
 	# 关闭数据库连接
 	conn.close()
 
-def join_insert_sql(table,item,append_dict):
+def join_insert_sql(table,append_dict,item=None):
 	'''
 	组拼基本面的insert语句
 	'''
 	insert = ''' insert into %s (''' % table
 	values = []
 	valueParams = ''
-	_dict = item.to_dict()
+	_dict ={}
+	if item is not None:
+		_dict = item.to_dict()
 	_dict = dict(_dict,**append_dict)
 	for k,v in _dict.iteritems():
 		if pd.notnull(v) and k!='name' and v!='--':
@@ -174,7 +182,61 @@ def join_insert_sql(table,item,append_dict):
 	return insert
 
 
+def save_banlance_data(table_name,df,code):
+	'''
+	保存资产负债表信息
+	'''
+	conn,cur=getConnAndCur()
+	# 删除第一行第一列
+	df = df.iloc[1:,1:]
+	col_index = -1
+	for col in df.columns:
+		col_index = col_index + 1 
+		year,quarter = getYearAndQuarter(col)
+		current_time = getCurrentTime()
+		# 每列数据为一个季度的资产负债表信息
+		stock_id=get_stock_id(code,conn,cur)
+		# 查询数据是否存在
+		count = cur.execute("select stock_id from %s where year = '%s' and quarter='%s' and stock_id='%s'" % (table_name,year,quarter,stock_id))
+		if count == 0:
+			try: 
+				#插入资产负债表信息 
+				owner_equity = df.iloc[81,col_index]
+				total_liability = df.iloc[69,col_index]
+				total_assets = df.iloc[82,col_index]
+				append_dict ={'code':code,
+						'year':year,
+						'quarter':quarter,
+						'report_date':col,
+						'owner_equity':owner_equity,
+						'total_assets':total_assets,
+						'total_liability':total_liability,
+						'create_time':current_time,
+						'update_time':current_time,
+						'stock_id':stock_id}
+				cur.execute(join_insert_sql(table_name,append_dict))
+				conn.commit()  
+			except Exception as e:  
+				print(e) 
+				conn.rollback() 
+		else:
+			print("%s exist,stock_id =%s and year =%s and quarter=%s" % (table_name,stock_id,year,quarter))
+	# 关闭数据库连接
+	conn.close()
 
+	
+
+def getYearAndQuarter(str_date):
+	year = str_date[:4]
+	month = str_date[4:6]
+	quarter = 4
+	if month in ['01','02','03']:  
+		quarter = 1
+	elif month in ['04','05','06']:  
+		quarter = 2
+	elif month in ['07', '08', '09']:  
+		quarter = 3
+	return year, quarter
 
 def getCurrentTime():
 	'''
@@ -209,10 +271,10 @@ def initClassifiedData():
 
 
 def init_basic_data():
-	# 添加股票列表
-	df = sf.get_stock_basics()
-	# print(df)
-	save_stock_basics(df)
+	# # 添加股票列表
+	# df = sf.get_stock_basics()
+	# # print(df)
+	# save_stock_basics(df)
 
 
 	# 添加基本面信息
@@ -224,11 +286,18 @@ def init_basic_data():
 	stock_debtpay:偿债能力
 	stock_cashflow：现金流量
 	'''
-	# df = sf.get_operation_data(2016,4)
-	# save_basic_data('stock_operation',df,2016,4)
+	df = sf.get_operation_data(2016,4)
+	save_basic_data('stock_operation',df,2016,4)
 
 
+def init_balance_data():
+	code = '600870'
+	df =  fd.get_balance_sheet(code)
+	save_banlance_data('stock_balance',df,code)
 
 
 if __name__ == '__main__':
-	init_basic_data()
+	df = pandas.read_excel('c:/day/balance.xlsx', startrow=0,startcol=0)
+
+	save_banlance_data('stock_balance',df,'600870')
+	
